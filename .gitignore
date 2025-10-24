@@ -1,0 +1,16 @@
+# Directorios generados por Maven (compilación y empaquetado)
+target/
+
+# Archivos generados por IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Archivos de Maven
+*.classpath
+*.project
+*.settings/
+
+# Archivos generados por Maven para el proyecto
+.mvn/
