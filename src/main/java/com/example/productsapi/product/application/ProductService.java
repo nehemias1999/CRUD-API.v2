@@ -1,75 +1,64 @@
 package com.example.productsapi.product.application;
 
-import com.example.productsapi.exceptions.EmptyProductsListException;
-import com.example.productsapi.exceptions.InvalidDataEntryException;
-import com.example.productsapi.exceptions.ProductNotFoundException;
+import com.example.productsapi.common.exception.InvalidDataEntryException;
+import com.example.productsapi.product.application.dto.mapper.IProductDTOMapper;
+import com.example.productsapi.product.application.dto.request.CreateProductDTORequest;
+import com.example.productsapi.product.application.dto.request.UpdateProductDTORequest;
+import com.example.productsapi.product.application.dto.response.ProductDTOResponse;
+import com.example.productsapi.product.application.exception.EmptyProductsListException;
+import com.example.productsapi.product.application.exception.ProductNotFoundException;
 import com.example.productsapi.product.domain.Product;
-import com.example.productsapi.product.domain.IProductRepository;
-import com.example.productsapi.product.infrastructure.database.entity.ProductEntity;
-import com.example.productsapi.product.infrastructure.database.mapper.IProductEntityMapper;
-import jakarta.validation.constraints.NotNull;
+import com.example.productsapi.product.domain.repository.IProductRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.orm.jpa.JpaSystemException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.persistence.PersistenceException;
-import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
+@Transactional
+@RequiredArgsConstructor
 public class ProductService implements IProductService {
 
     private final IProductRepository productRepository;
-    private final IProductEntityMapper productEntityMapper;
-
-    public ProductService(
-            IProductRepository productRepository,
-            IProductEntityMapper productEntityMapper) {
-        this.productRepository = productRepository;
-        this.productEntityMapper = productEntityMapper;
-    }
+    private final IProductDTOMapper productDTOMapper;
 
     @Override
-    public List<Product> getAllProductsPagedAnSorted(@NotNull Pageable pageable) {
-        Page<ProductEntity> productsPage = productRepository.findAll(
-                PageRequest.of(
-                        pageable.getPageNumber(),
-                        pageable.getPageSize(),
-                        pageable.getSortOr(Sort.by(Sort.Direction.ASC, "id"))
-                )
-        );
+    @Transactional(readOnly = true)
+    public Page<ProductDTOResponse> getAll(Pageable pageable) {
+        Page<Product> productsPage = productRepository.findAll(pageable);
 
         if(productsPage.isEmpty())
             throw new EmptyProductsListException();
 
         return productsPage
-                .map(productEntityMapper::toProduct)
-                .toList();
+                .map(productDTOMapper::toProductDTOResponse);
     }
 
     @Override
-    public Product getProductById(@NotNull UUID id) {
-        Optional<ProductEntity> productEntityOptional = productRepository.findById(id);
-
-        if(productEntityOptional.isEmpty())
-            throw new ProductNotFoundException();
-
-        return productEntityMapper.toProduct(productEntityOptional.get());
+    @Transactional(readOnly = true)
+    public ProductDTOResponse getById(UUID id) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(ProductNotFoundException::new);
+        return productDTOMapper.toProductDTOResponse(product);
     }
 
     @Override
-    public Product createProduct(@NotNull Product product) {
+    public ProductDTOResponse create(CreateProductDTORequest createProductDTORequest) {
         try {
-            ProductEntity productEntity = productEntityMapper.toProductEntity(product);
 
-            ProductEntity createdProductEntity = productRepository.save(productEntity);
+            Product product = productDTOMapper.toProduct(createProductDTORequest);
 
-            return productEntityMapper.toProduct(createdProductEntity);
+            validateProductData(product);
+
+            Product createdProduct = productRepository.save(product);
+
+            return productDTOMapper.toProductDTOResponse(createdProduct);
 
         } catch (DataIntegrityViolationException | JpaSystemException | PersistenceException e) {
             throw new InvalidDataEntryException();
@@ -77,19 +66,21 @@ public class ProductService implements IProductService {
     }
 
     @Override
-    public Product updateProduct(@NotNull UUID id, @NotNull Product product) {
+    public ProductDTOResponse update(UUID id, UpdateProductDTORequest updateProductDTORequest) {
         if(!productRepository.existsById(id))
             throw new ProductNotFoundException();
 
         try {
 
-            product.setId(id);
+            updateProductDTORequest.setId(id);
 
-            ProductEntity productEntity = productEntityMapper.toProductEntity(product);
+            Product product = productDTOMapper.toProduct(updateProductDTORequest);
 
-            ProductEntity updatedProductEntity = productRepository.save(productEntity);
+            validateProductData(product);
 
-            return productEntityMapper.toProduct(updatedProductEntity);
+            Product updatedProduct = productRepository.save(product);
+
+            return productDTOMapper.toProductDTOResponse(updatedProduct);
 
         } catch (DataIntegrityViolationException | JpaSystemException | PersistenceException e) {
             throw new InvalidDataEntryException();
@@ -97,11 +88,33 @@ public class ProductService implements IProductService {
     }
 
     @Override
-    public void deleteProduct(@NotNull UUID id) {
+    public void delete(UUID id) {
         if(!productRepository.existsById(id))
             throw new ProductNotFoundException();
 
         productRepository.deleteById(id);
+    }
+
+    private void validateProductData(Product product) {
+        if (product.getName() == null || product.getName().isBlank()) {
+            throw new InvalidDataEntryException("Product name is required");
+        }
+
+        if (product.getBasePrice() == null || product.getBasePrice() <= 0) {
+            throw new InvalidDataEntryException("Base price must be greater than zero");
+        }
+
+        if (product.getCostPrice() == null || product.getCostPrice() <= 0) {
+            throw new InvalidDataEntryException("Cost price must be greater than zero");
+        }
+
+        if (product.getBasePrice() < product.getCostPrice()) {
+            throw new InvalidDataEntryException("Base price cannot be lower than cost price");
+        }
+
+        if (product.getStock() == null || product.getStock() < 0) {
+            throw new InvalidDataEntryException("Stock cannot be negative");
+        }
     }
 
 }

@@ -1,4 +1,4 @@
-package com.example.productsapi.exceptions;
+package com.example.productsapi.product.application.exception;
 
 public class EmptyProductsListException extends RuntimeException {
 

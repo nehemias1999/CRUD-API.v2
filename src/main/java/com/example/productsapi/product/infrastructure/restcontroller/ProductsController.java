@@ -1,79 +1,66 @@
 package com.example.productsapi.product.infrastructure.restcontroller;
 
 import com.example.productsapi.product.application.IProductService;
-import com.example.productsapi.product.domain.Product;
-import com.example.productsapi.product.infrastructure.restcontroller.dto.ProductDTO;
-import com.example.productsapi.product.infrastructure.restcontroller.mapper.IProductMapper;
+import com.example.productsapi.product.application.dto.request.CreateProductDTORequest;
+import com.example.productsapi.product.application.dto.request.UpdateProductDTORequest;
+import com.example.productsapi.product.application.dto.response.ProductDTOResponse;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.data.web.SortDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/products")
-public class ProductsController implements IProductController {
+@Validated
+@RequiredArgsConstructor
+public class ProductsController {
 
     private final IProductService productService;
-    private final IProductMapper productMapper;
 
-    public ProductsController(
-            IProductService productService,
-            IProductMapper productMapper) {
-        this.productService = productService;
-        this.productMapper = productMapper;
-    }
-
-    @GetMapping("/getAll")
-    public ResponseEntity<List<ProductDTO>> getAllProducts(Pageable pageable) {
-        List<ProductDTO> productsDTOList = productService.getAllProductsPagedAnSorted(pageable)
-                .stream()
-                .map(productMapper::toProductDTO)
-                .toList();
-
-        return new ResponseEntity<>(productsDTOList, HttpStatus.OK);
+    @GetMapping
+    public ResponseEntity<Page<ProductDTOResponse>> getAll(
+            @PageableDefault(size = 20)
+            @SortDefault.SortDefaults({
+                    @SortDefault(sort = "id", direction = Sort.Direction.ASC)
+            })
+            Pageable pageable) {
+        return ResponseEntity.ok(productService.getAll(pageable));
     }
     
-    @GetMapping("/get/{id}")
-    public ResponseEntity<ProductDTO> getProductById(@PathVariable UUID id) {
-        Product product = productService.getProductById(id);
-
-        ProductDTO productDTO = productMapper.toProductDTO(product);
-
-        return new ResponseEntity<>(productDTO, HttpStatus.OK);
+    @GetMapping("/{id}")
+    public ResponseEntity<ProductDTOResponse> getById(@PathVariable @NotNull UUID id) {
+        return ResponseEntity.ok(productService.getById(id));
     }
 
-    @PostMapping("/create")
-    public ResponseEntity<ProductDTO> createProduct(@RequestBody ProductDTO productDTO) {
-        Product product = productMapper.toProduct(productDTO);
-
-        Product createdProduct = productService.createProduct(product);
-
-        ProductDTO responseProductDTO = productMapper.toProductDTO(createdProduct);
-
-        return new ResponseEntity<>(responseProductDTO, HttpStatus.CREATED);
+    @PostMapping
+    public ResponseEntity<ProductDTOResponse> create(@Valid @RequestBody CreateProductDTORequest createProductDTORequest) {
+        ProductDTOResponse productDTOResponse = productService.create(createProductDTORequest);
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(productDTOResponse);
     }
 
-    @PutMapping("/update/{id}")
-    public ResponseEntity<ProductDTO> updateProduct(
-            @PathVariable UUID id,
-            @RequestBody ProductDTO productDTO) {
-        Product product = productMapper.toProduct(productDTO);
-
-        Product updatedProduct = productService.updateProduct(id, product);
-
-        ProductDTO responseProductDTO = productMapper.toProductDTO(updatedProduct);
-
-        return new ResponseEntity<>(responseProductDTO, HttpStatus.OK);
+    @PutMapping("/{id}")
+    public ResponseEntity<ProductDTOResponse> update(
+            @PathVariable @NotNull UUID id,
+            @Valid @RequestBody UpdateProductDTORequest updateProductDTORequest) {
+        return ResponseEntity.ok(productService.update(id, updateProductDTORequest));
     }
 
-    @DeleteMapping("/delete/{id}")
-    public ResponseEntity<?> deleteProduct(@PathVariable UUID id) {
-        productService.deleteProduct(id);
-
-        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> delete(@PathVariable @NotNull UUID id) {
+        productService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 
 }

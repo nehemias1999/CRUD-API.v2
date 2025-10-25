@@ -1,17 +1,19 @@
 package com.example.productsapi.product.application;
 
-import com.example.productsapi.product.domain.Product;
+import com.example.productsapi.product.application.dto.request.CreateProductDTORequest;
+import com.example.productsapi.product.application.dto.request.UpdateProductDTORequest;
+import com.example.productsapi.product.application.dto.response.ProductDTOResponse;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-import java.util.List;
 import java.util.UUID;
 
 public interface IProductService {
 
-    List<Product> getAllProductsPagedAnSorted(Pageable pageable);
-    Product getProductById(UUID id);
-    Product createProduct(Product product);
-    Product updateProduct(UUID id, Product product);
-    void deleteProduct(UUID id);
+    Page<ProductDTOResponse> getAll(Pageable pageable);
+    ProductDTOResponse getById(UUID id);
+    ProductDTOResponse create(CreateProductDTORequest createProductDTORequest);
+    ProductDTOResponse update(UUID id, UpdateProductDTORequest updateProductDTORequest);
+    void delete(UUID id);
 
 }
